@@ -58,3 +58,5 @@ node index.js
 
  Las apuestas enviadas en cola se pueden observar en RABBITMQ. > Queues and Streams
 
+link http://localhost:3000/apostar 
+link http://localhost:3001/users 

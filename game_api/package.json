@@ -1,12 +1,12 @@
 {
   "dependencies": {
     "amqplib": "^0.10.4",
+    "axios": "^1.7.2",
     "express": "^4.19.2"
   },
   "name": "game_api",
   "version": "1.0.0",
   "main": "index.js",
-  "devDependencies": {},
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

@@ -3,13 +3,12 @@ const amqp = require('amqplib');
 
 const app = express();
 const queue = 'apuestas';
-const delayedQueue = 'apuestas_delayed';
 const exchange = 'apuestas_exchange';
 
 const usuarios = [
-  { username: 'usuario1', saldo: 100 },
-  { username: 'usuario2', saldo: 200 },
-  { username: 'usuario3', saldo: 200 },
+  { username: 'usuario1', saldo: 500 },
+  { username: 'usuario2', saldo: 500 },
+  { username: 'usuario3', saldo: 500 },
   // Agrega más usuarios aquí
 ];
 
@@ -27,7 +26,7 @@ async function conectarRabbitMQ() {
 async function consumirApuestas() {
   const channel = await conectarRabbitMQ();
   channel.consume(queue, (msg) => {
-    console.log('apuesta recibida');
+    console.log('Apuesta recibida');
     const apuesta = JSON.parse(msg.content.toString());
     const usuario = usuarios.find((u) => u.username === apuesta.usuario);
     if (usuario) {

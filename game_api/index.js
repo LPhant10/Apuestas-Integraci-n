@@ -1,6 +1,7 @@
 const express = require('express');
 const amqp = require('amqplib');
 const { DateTime } = require('luxon');
+const axios = require('axios'); // Asegúrate de tener axios instalado
 
 const app = express();
 const exchange = 'apuestas_exchange';
@@ -12,9 +13,9 @@ const finalQueue = 'apuestas';
 
 // Lista de usuarios con su saldo
 const usuarios = [
-  { username: 'usuario1', saldo: 100 },
-  { username: 'usuario2', saldo: 200 },
-  { username: 'usuario3', saldo: 200 }
+  { username: 'Luis Cardenas', saldo: 500 },
+  { username: 'usuario2', saldo: 500 },
+  { username: 'usuario3', saldo: 500 }
   // Agrega más usuarios aquí si es necesario
 ];
 
@@ -84,20 +85,27 @@ function obtenerSaldo(usuario) {
   return usuarioEncontrado ? usuarioEncontrado.saldo : null;
 }
 
+// Función para verificar el estado de user_api
+async function verificarEstadoUserApi() {
+  try {
+    const respuesta = await axios.get('http://localhost:3001/estado');
+    return respuesta.data.estado === 'activo';
+  } catch (error) {
+    console.error('Error al verificar el estado de user_api:', error.message);
+    return false; // En caso de error, consideramos user_api como inactivo
+  }
+}
+
 app.post('/apostar', async (req, res) => {
   const { partido, montoApostado, usuario } = req.body;
-  const timestamp = DateTime.local().setZone('America/Lima').toFormat('yyyy-MM-dd HH:mm:ss'); // Hora de Lima con formato detallado
-  console.log(`Apuesta enviada: Usuario: ${usuario}, Partido: ${partido}, Monto: ${montoApostado}, Hora: ${timestamp}`);
+  const timestamp = DateTime.local().setZone('America/Lima').toFormat('yyyy-MM-dd HH:mm:ss');
 
-  // Buscar el usuario en la lista
   const usuarioExistente = usuarios.find(u => u.username === usuario);
-
   if (!usuarioExistente) {
     console.log(`Usuario ${usuario} no encontrado`);
     return res.status(404).send('Usuario no encontrado');
   }
 
-  // Verificar saldo suficiente
   if (usuarioExistente.saldo < montoApostado) {
     console.log(`Usuario ${usuario} sin saldo suficiente`);
     return res.status(403).send('Usuario sin saldo suficiente');
@@ -107,14 +115,23 @@ app.post('/apostar', async (req, res) => {
   const apuesta = { partido, montoApostado, usuario, timestamp };
 
   try {
-    // Publica el mensaje en la cola de 1 minuto
-    await channel.publish(exchange, 'apuestas_1m', Buffer.from(JSON.stringify(apuesta)));
+    // Verificar el estado de user_api
+    const userApiActivo = await verificarEstadoUserApi();
 
-    // Actualizar saldo del usuario
-    usuarioExistente.saldo -= montoApostado;
-    console.log(`Saldo restante para ${usuario}: ${usuarioExistente.saldo}`);
-
-    res.send('Apuesta realizada');
+    if (userApiActivo) {
+      // Si user_api está activo, procesa directamente la apuesta
+      console.log(`Apuesta enviada directamente: Usuario: ${usuario}, Partido: ${partido}, Monto: ${montoApostado}, Hora: ${timestamp}`);
+      usuarioExistente.saldo -= montoApostado;
+      console.log(`Saldo restante para ${usuario}: ${usuarioExistente.saldo}`);
+      res.send('Apuesta realizada directamente');
+    } else {
+      // Si user_api está inactivo, encola la apuesta
+      console.log(`Apuesta enviada a la cola: Usuario: ${usuario}, Partido: ${partido}, Monto: ${montoApostado}, Hora: ${timestamp}`);
+      await channel.publish(exchange, 'apuestas_1m', Buffer.from(JSON.stringify(apuesta)));
+      usuarioExistente.saldo -= montoApostado;
+      console.log(`Saldo restante para ${usuario}: ${usuarioExistente.saldo}`);
+      res.send('Apuesta encolada para procesamiento futuro');
+    }
   } catch (error) {
     console.error('Error al procesar la apuesta:', error.message);
     res.status(500).json({ error: 'Error al procesar la apuesta' });

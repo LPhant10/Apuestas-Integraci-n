@@ -1,10 +1,13 @@
+// Importa las bibliotecas express, amqplib, luxon (para manejo de fechas y tiempos) y axios (para realizar peticiones HTTP).
 const express = require('express');
 const amqp = require('amqplib');
 const { DateTime } = require('luxon');
-const axios = require('axios'); // Asegúrate de tener axios instalado
+const axios = require('axios'); 
 
-const app = express();
-const exchange = 'apuestas_exchange';
+const app = express();                                                      // Crea una instancia de la aplicación Express.
+const exchange = 'apuestas_exchange';                                       // Define el nombre del intercambio apuestas_exchange.
+
+// Define los nombres de varias colas con diferentes retrasos (1m, 10m, 1h, 1d) y una cola final.
 const queue1m = 'apuestas_delayed_1m';
 const queue10m = 'apuestas_delayed_10m';
 const queue1h = 'apuestas_delayed_1h';
@@ -22,13 +25,16 @@ const usuarios = [
 // Middleware para analizar los cuerpos JSON
 app.use(express.json());
 
+// Define una función asíncrona conectarRabbitMQ que:
 async function conectarRabbitMQ() {
-  const conn = await amqp.connect('amqp://game_api:game_api@localhost');
-  const channel = await conn.createChannel();
+  const conn = await amqp.connect('amqp://game_api:game_api@localhost');      // Conecta a RabbitMQ usando las credenciales y la URL proporcionada.
+  const channel = await conn.createChannel();                                 // Crea un canal de comunicación en RabbitMQ.
 
-  await channel.assertExchange(exchange, 'direct', { durable: true });
+  await channel.assertExchange(exchange, 'direct', { durable: true });       //  Declara (crea) un intercambio de tipo direct con durabilidad.
 
-  // Configuración de las colas
+  // Configuración de las colas Configura varias colas con diferentes tiempos de vida (TTL) y las vincula al intercambio. Cada cola tiene un TTL diferente 
+  // (1 minuto, 10 minutos, 1 hora, 1 día) y se reenvían a la siguiente cola en la cadena mediante x-dead-letter-exchange y x-dead-letter-routing-key. La cola 
+  // final finalQueue se usa para el procesamiento definitivo de las apuestas.
   await channel.assertQueue(queue1m, {
     durable: true,
     arguments: {
@@ -79,40 +85,42 @@ async function conectarRabbitMQ() {
   return channel;
 }
 
-// Función para obtener el saldo de un usuario
+// Define una función obtenerSaldo que encuentra y retorna el saldo de un usuario específico.
 function obtenerSaldo(usuario) {
   const usuarioEncontrado = usuarios.find(u => u.username === usuario);
   return usuarioEncontrado ? usuarioEncontrado.saldo : null;
 }
 
-// Función para verificar el estado de user_api
+// Define una función asíncrona verificarEstadoUserApi que hace una petición GET al endpoint /estado
+// de user_api para verificar su estado. Si el servicio está activo, retorna true; de lo contrario, retorna false.
 async function verificarEstadoUserApi() {
   try {
     const respuesta = await axios.get('http://localhost:3001/estado');
     return respuesta.data.estado === 'activo';
   } catch (error) {
     console.error('Error al verificar el estado de user_api:', error.message);
-    return false; // En caso de error, consideramos user_api como inactivo
+    return false;                                                                 // En caso de error, consideramos user_api como inactivo
   }
 }
 
+// Define un endpoint POST /apostar para realizar una apuesta
 app.post('/apostar', async (req, res) => {
-  const { partido, montoApostado, usuario } = req.body;
-  const timestamp = DateTime.local().setZone('America/Lima').toFormat('yyyy-MM-dd HH:mm:ss');
+  const { partido, montoApostado, usuario } = req.body;                            // Extrae partido, montoApostado y usuario del cuerpo de la petición.
+  const timestamp = DateTime.local().setZone('America/Lima').toFormat('yyyy-MM-dd HH:mm:ss');  // Obtiene la hora actual en la zona horaria de Lima y la formatea.
 
-  const usuarioExistente = usuarios.find(u => u.username === usuario);
-  if (!usuarioExistente) {
+  const usuarioExistente = usuarios.find(u => u.username === usuario);             // Busca al usuario que realiza la apuesta.
+  if (!usuarioExistente) {                                                         // Si el usuario no existe, responde con un error 404.
     console.log(`Usuario ${usuario} no encontrado`);
-    return res.status(404).send('Usuario no encontrado');
+    return res.status(404).send('Usuario no encontrado');                        
   }
 
-  if (usuarioExistente.saldo < montoApostado) {
+  if (usuarioExistente.saldo < montoApostado) {                                  // Si el saldo del usuario es insuficiente, responde con un error 403.
     console.log(`Usuario ${usuario} sin saldo suficiente`);
     return res.status(403).send('Usuario sin saldo suficiente');
   }
 
-  const channel = await conectarRabbitMQ();
-  const apuesta = { partido, montoApostado, usuario, timestamp };
+  const channel = await conectarRabbitMQ();                                     // Conecta a RabbitMQ.
+  const apuesta = { partido, montoApostado, usuario, timestamp };               // Crea un objeto apuesta con los datos de la apuesta y el timestamp.
 
   try {
     // Verificar el estado de user_api

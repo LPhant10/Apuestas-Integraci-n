@@ -46,7 +46,7 @@ node index.js
     {
       "partido": "Equipo A vs Equipo B",
       "montoApostado": 50,
-      "usuario": "usuario1"
+      "usuario": "Luis Cardenas"
     }
 
 > Haz clic en el botón "Send" para enviar la solicitud.

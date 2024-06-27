@@ -17,8 +17,8 @@ const finalQueue = 'apuestas';
 // Lista de usuarios con su saldo
 const usuarios = [
   { username: 'Luis Cardenas', saldo: 500 },
-  { username: 'usuario2', saldo: 500 },
-  { username: 'usuario3', saldo: 500 }
+  { username: 'Ernesto Gaspar', saldo: 500 },
+  { username: 'L Phant', saldo: 500 }
   // Agrega más usuarios aquí si es necesario
 ];
 

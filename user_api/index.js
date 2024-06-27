@@ -11,8 +11,8 @@ const exchange = 'apuestas_exchange';                                           
 // Define una lista de usuarios con sus respectivos nombres de usuario y saldo inicial.
 const usuarios = [     
   { username: 'Luis Cardenas', saldo: 500 },
-  { username: 'usuario2', saldo: 500 },
-  { username: 'usuario3', saldo: 500 },
+  { username: 'Ernesto Gaspar', saldo: 500 },
+  { username: 'L Phant', saldo: 500 }
   // Agrega más usuarios aquí
 ];
 
